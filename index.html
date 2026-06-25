@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance Matrix Dashboard</title>
+  <meta name="description" content="Interactive performance dashboard — upload monthly Variable Pay CSV files to track estimations, approvals, deliveries and time utilisation per employee." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f4f5f7; --card: #ffffff; --border: #e2e5ea; --text: #1a1d23;
+      --muted: #6b7280; --green-bg: #f0faf4; --green-text: #15803d;
+      --amber-bg: #fffbeb; --amber-text: #92400e; --red-bg: #fff5f5; --red-text: #991b1b;
+      --primary: #4f46e5; --primary-light: #eef2ff; --font: 'Inter', system-ui, sans-serif;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+    /* ── Header ─────────────────────────────────── */
+    .header { background:#fff; border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; gap:12px; position:sticky; top:0; z-index:100; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+    .header-logo { width:32px; height:32px; background:var(--primary); border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px; flex-shrink:0; }
+    .header-title { font-weight:700; font-size:15px; }
+    .header-sub { font-size:12px; color:var(--muted); }
+    .header-spacer { flex:1; }
+    .header-badge { background:var(--primary-light); color:var(--primary); font-size:11px; font-weight:600; padding:3px 8px; border-radius:20px; }
+    .header-tag { font-size:11px; color:var(--muted); background:#f8f9fb; border:1px solid var(--border); padding:3px 8px; border-radius:20px; }
+
+    /* ── Upload bar ──────────────────────────────── */
+    .upload-bar { background:#fff; border-bottom:1px solid var(--border); padding:10px 24px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .upload-btn-label {
+      display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+      background:var(--primary); color:#fff; border-radius:7px; padding:8px 16px;
+      font-size:13px; font-weight:600; transition:opacity .15s;
+    }
+    .upload-btn-label:hover { opacity:.88; }
+    #csvFileInput { display:none; }
+    .upload-info { font-size:12px; color:var(--muted); }
+    .upload-status { font-size:12px; font-weight:600; padding:4px 10px; border-radius:5px; }
+    .upload-status.ok  { background:var(--green-bg); color:var(--green-text); }
+    .upload-status.err { background:var(--red-bg);   color:var(--red-text);   }
+    .loaded-months { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .month-chip { display:inline-flex; align-items:center; gap:5px; background:#f0f1ff; border:1px solid #c7d2fe; color:#4338ca; border-radius:5px; padding:3px 8px; font-size:11px; font-weight:600; }
+    .month-chip-del { cursor:pointer; color:#6366f1; font-size:13px; line-height:1; }
+    .month-chip-del:hover { color:#ef4444; }
+
+    /* ── Filter bar ──────────────────────────────── */
+    .filter-bar { background:#fff; border-bottom:1px solid var(--border); padding:12px 24px; display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+    .filter-group { display:flex; flex-direction:column; gap:4px; }
+    .filter-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+    .filter-select { border:1px solid var(--border); background:#fff; color:var(--text); border-radius:6px; padding:7px 10px; font-size:13px; font-family:var(--font); cursor:pointer; min-width:160px; outline:none; transition:border-color .15s; }
+    .filter-select:focus { border-color:var(--primary); }
+    .filter-divider { width:1px; height:36px; background:var(--border); margin:0 4px; align-self:flex-end; margin-bottom:4px; }
+    .filter-hint { font-size:11px; color:var(--muted); padding:4px 0; align-self:flex-end; }
+
+    /* ── Main ────────────────────────────────────── */
+    .main { padding:24px; max-width:1500px; margin:0 auto; display:flex; flex-direction:column; gap:28px; }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty-state { text-align:center; padding:80px 24px; color:var(--muted); }
+    .empty-state .icon { font-size:48px; margin-bottom:16px; }
+    .empty-state h2 { font-size:18px; font-weight:700; color:var(--text); margin-bottom:8px; }
+    .empty-state p { font-size:14px; max-width:440px; margin:0 auto; }
+
+    /* ── Section headers ─────────────────────────── */
+    .section-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+    .section-icon { width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+    .section-title { font-weight:700; font-size:15px; }
+    .section-sub { font-size:12px; color:var(--muted); }
+
+    /* ── KPI Cards ───────────────────────────────── */
+    .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; }
+    .kpi-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px 16px; }
+    .kpi-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+    .kpi-value { font-size:28px; font-weight:700; line-height:1; }
+    .kpi-sub { font-size:12px; color:var(--muted); margin-top:5px; }
+    .kpi-pill { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-top:5px; }
+    .pill-green { background:var(--green-bg); color:var(--green-text); }
+    .pill-amber { background:var(--amber-bg); color:var(--amber-text); }
+    .pill-red   { background:var(--red-bg);   color:var(--red-text);   }
+
+    /* ── Card ────────────────────────────────────── */
+    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; }
+
+    /* ── Table ───────────────────────────────────── */
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th { background:#f8f9fb; border-bottom:1px solid var(--border); padding:9px 12px; text-align:left; font-weight:600; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; cursor:pointer; user-select:none; }
+    thead th:hover { color:var(--primary); }
+    thead th .sort-icon { margin-left:4px; opacity:.4; }
+    thead th.sorted .sort-icon { opacity:1; color:var(--primary); }
+    tbody tr { border-bottom:1px solid var(--border); cursor:pointer; transition:background .1s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:#f8f9fb; }
+    tbody td { padding:10px 12px; white-space:nowrap; }
+    tr.row-green { background:var(--green-bg); }
+    tr.row-green:hover { background:#e5f7ed; }
+    tr.row-red { background:var(--red-bg); }
+    tr.row-red:hover { background:#fee2e2; }
+    .name-cell { font-weight:600; }
+    .role-badge { font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; margin-right:3px; display:inline-block; }
+    .role-E { background:#ede9fe; color:#5b21b6; }
+    .role-M { background:#e0f2fe; color:#0c4a6e; }
+    .role-D { background:#fce7f3; color:#831843; }
+    .rate-bar-wrap { display:flex; align-items:center; gap:6px; }
+    .rate-bar { height:6px; border-radius:3px; background:var(--border); flex:1; min-width:60px; overflow:hidden; }
+    .rate-bar-fill { height:100%; border-radius:3px; }
+    .rate-num { font-size:12px; font-weight:600; min-width:42px; text-align:right; }
+
+    /* ── Expand rows ─────────────────────────────── */
+    .expand-row { display:none; }
+    .expand-row.open { display:table-row; }
+    .expand-cell { padding:0 !important; }
+    .expand-inner { background:#f8f9fb; border-bottom:1px solid var(--border); padding:16px 20px; }
+    .expand-title { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+    .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px; }
+    .project-card { background:#fff; border:1px solid var(--border); border-radius:7px; padding:10px 12px; }
+    .project-name { font-weight:600; font-size:12.5px; margin-bottom:7px; word-break:break-word; white-space:normal; line-height:1.35; }
+    .project-stats { font-size:11px; color:var(--muted); display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
+    .project-stat { background:#f8f9fb; border:1px solid var(--border); border-radius:4px; padding:2px 6px; line-height:1.5; }
+    .project-feedback { display:inline-block; font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:20px; margin-top:7px; }
+    .chevron { display:inline-block; transition:transform .2s; font-size:11px; margin-left:4px; color:var(--muted); }
+    .chevron.open { transform:rotate(90deg); }
+
+    /* ── Notes / review ──────────────────────────── */
+    .note-block { margin-top:16px; }
+    .note-textarea { width:100%; min-height:80px; resize:vertical; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:13px; font-family:var(--font); color:var(--text); outline:none; }
+    .note-textarea:focus { border-color:var(--primary); }
+    .note-actions { display:flex; align-items:center; gap:10px; margin-top:8px; }
+    .note-save-btn { background:var(--primary); color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font); }
+    .note-save-btn:hover { opacity:.88; }
+    .note-meta { font-size:11px; color:var(--muted); }
+
+    /* ── Funnel ──────────────────────────────────── */
+    .funnel-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    @media(max-width:700px){ .funnel-grid { grid-template-columns:1fr; } }
+    .funnel-stage { border:1px solid var(--border); border-radius:10px; padding:18px; position:relative; }
+    .funnel-stage-num { font-size:36px; font-weight:700; margin-bottom:4px; }
+    .funnel-stage-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+    .funnel-rate { font-size:12px; margin-bottom:14px; }
+    .funnel-people { display:flex; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; }
+    .funnel-person { display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:5px 8px; background:#f8f9fb; border-radius:5px; }
+    .funnel-person-count { font-weight:700; color:var(--primary); margin-left:8px; flex-shrink:0; }
+    .funnel-arrow { position:absolute; right:-24px; top:50%; transform:translateY(-50%); font-size:22px; color:#d1d5db; z-index:1; }
+    .funnel-stage:last-child .funnel-arrow { display:none; }
+
+    /* ── Charts ──────────────────────────────────── */
+    .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:900px){ .charts-grid { grid-template-columns:1fr; } }
+    .chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; }
+    .chart-title { font-weight:700; font-size:13px; margin-bottom:14px; }
+    .chart-container { position:relative; height:230px; }
+
+    /* ── Feedback dots ───────────────────────────── */
+    .fb-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:3px; }
+    .fb-pos  { background:#22c55e; }
+    .fb-neu  { background:#f59e0b; }
+    .fb-neg  { background:#ef4444; }
+    .fb-none { background:#d1d5db; }
+
+    /* ── Utility ─────────────────────────────────── */
+    .text-green { color:var(--green-text); }
+    .text-amber { color:var(--amber-text); }
+    .text-red   { color:var(--red-text);   }
+    .text-muted { color:var(--muted); }
+    .no-data { text-align:center; color:var(--muted); padding:40px; font-size:13px; }
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:3px; }
+
+    /* ── Login overlay ───────────────────────────── */
+    .login-overlay { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .login-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:32px; width:320px; }
+    .login-card .header-logo { margin:0 auto 16px; }
+    .login-title { font-weight:700; font-size:16px; text-align:center; margin-bottom:4px; }
+    .login-sub { font-size:12px; color:var(--muted); text-align:center; margin-bottom:20px; }
+    .login-field { display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+    .login-field label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+    .login-field input { border:1px solid var(--border); border-radius:6px; padding:9px 10px; font-size:13px; font-family:var(--font); outline:none; }
+    .login-field input:focus { border-color:var(--primary); }
+    .login-btn { width:100%; background:var(--primary); color:#fff; border:none; border-radius:7px; padding:10px; font-size:13px; font-weight:600; cursor:pointer; margin-top:6px; }
+    .login-btn:hover { opacity:.9; }
+    .login-error { font-size:12px; color:var(--red-text); background:var(--red-bg); border-radius:6px; padding:8px 10px; margin-bottom:12px; display:none; }
+    .logout-btn { font-size:11px; color:var(--muted); background:#f8f9fb; border:1px solid var(--border); padding:5px 10px; border-radius:6px; cursor:pointer; font-family:var(--font); }
+    .logout-btn:hover { color:var(--red-text); border-color:#fca5a5; }
+
+    /* ── View tabs (Dashboard / Manage Data) ───────── */
+    .view-tabs { display:flex; gap:3px; background:#f1f2f5; border-radius:8px; padding:3px; }
+    .view-tab { border:none; background:transparent; padding:6px 14px; font-size:12px; font-weight:600; color:var(--muted); border-radius:6px; cursor:pointer; font-family:var(--font); }
+    .view-tab.active { background:#fff; color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+
+    /* ── Manage Data view ───────────────────────────── */
+    .manage-controls { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+    .mg-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:12px 0; }
+    .mg-row-btn { font-size:11px; font-weight:600; padding:4px 10px; border-radius:5px; border:1px solid var(--border); background:#fff; color:var(--text); cursor:pointer; margin-right:6px; font-family:var(--font); }
+    .mg-row-btn:hover { background:#f8f9fb; }
+    .mg-row-btn-danger { color:var(--red-text); border-color:#fca5a5; }
+    .mg-row-btn-danger:hover { background:var(--red-bg); }
+  </style>
+</head>
+<body>
+
+<!-- ══ LOGIN OVERLAY ═════════════════════════════════ -->
+<div class="login-overlay" id="loginOverlay" style="display:none">
+  <form class="login-card" id="loginForm">
+    <div class="header-logo">PM</div>
+    <div class="login-title">Performance Matrix Dashboard</div>
+    <div class="login-sub">Sign in to view the dashboard</div>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-field">
+      <label for="loginUsername">Username</label>
+      <input type="text" id="loginUsername" autocomplete="username" required />
+    </div>
+    <div class="login-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" required />
+    </div>
+    <button type="submit" class="login-btn">Sign in</button>
+  </form>
+</div>
+
+<!-- ══ HEADER ════════════════════════════════════════ -->
+<div class="header">
+  <div class="header-logo">PM</div>
+  <div>
+    <div class="header-title">Performance Matrix Dashboard</div>
+    <div class="header-sub">Estimation → Approval → Delivery</div>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="header-tag" id="headerStats">No data loaded</div>
+  <div class="header-badge">Live</div>
+  <div class="view-tabs">
+    <button class="view-tab active" id="tabDashboardBtn" onclick="switchView('dashboard')">Dashboard</button>
+    <button class="view-tab" id="tabManageBtn" onclick="switchView('manage')">Manage Data</button>
+  </div>
+  <button class="logout-btn" id="logoutBtn">Sign out</button>
+</div>
+
+<!-- ══ UPLOAD BAR ════════════════════════════════════ -->
+<div class="upload-bar">
+  <label class="upload-btn-label" for="csvFileInput">
+    ⬆ Upload Monthly CSV
+  </label>
+  <input type="file" id="csvFileInput" accept=".csv" multiple />
+  <div class="upload-info">
+    Upload one or more <strong>Variable Pay – MMM YY.csv</strong> files.<br>
+    Each file covers one month. Data is stored in your browser and persists across sessions.
+  </div>
+  <div id="uploadStatus"></div>
+  <div style="flex:1"></div>
+  <div>
+    <div class="filter-label" style="margin-bottom:4px">Loaded Months</div>
+    <div class="loaded-months" id="loadedMonths"></div>
+  </div>
+</div>
+
+<!-- ══ FILTER BAR ════════════════════════════════════ -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <div class="filter-label">Month</div>
+    <select class="filter-select" id="filterMonth"></select>
+  </div>
+  <div class="filter-divider"></div>
+  <div class="filter-group">
+    <div class="filter-label">Role</div>
+    <select class="filter-select" id="filterRole">
+      <option value="All">All Roles</option>
+      <option value="Estimator">Estimator</option>
+      <option value="Manager">Manager</option>
+      <option value="Developer">Developer</option>
+    </select>
+  </div>
+  <div class="filter-divider"></div>
+  <div class="filter-group">
+    <div class="filter-label">Employee</div>
+    <select class="filter-select" id="filterEmployee"><option value="All">All Employees</option></select>
+  </div>
+  <div class="filter-hint">↑ All filters apply to every section including charts · Month filter controls Sections A–C; charts always show all months</div>
+</div>
+
+<!-- ══ MAIN CONTENT ══════════════════════════════════ -->
+<div class="main" id="mainContent">
+  <div class="empty-state" id="emptyState">
+    <div class="icon">📂</div>
+    <h2>No data loaded yet</h2>
+    <p>Upload a <strong>Variable Pay – MMM YY.csv</strong> file using the button above. You can upload files for multiple months — they stack and update the dashboard automatically.</p>
+  </div>
+</div>
+
+<!-- ══ MANAGE DATA VIEW ══════════════════════════════ -->
+<div class="main" id="manageView" style="display:none">
+  <div class="card">
+    <div class="section-header">
+      <div class="section-icon" style="background:#e0f2fe">✎</div>
+      <div>
+        <div class="section-title">Manage Data</div>
+        <div class="section-sub">Add, edit, or remove individual Estimation / Approval / Delivery records for a month</div>
+      </div>
+    </div>
+
+    <div class="manage-controls">
+      <div class="filter-group">
+        <div class="filter-label">Month</div>
+        <select class="filter-select" id="mgMonth"></select>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">New month</div>
+        <input type="text" class="filter-select" id="mgNewMonth" placeholder="YYYY-MM" style="width:120px">
+      </div>
+      <button class="mg-row-btn" onclick="mgUseNewMonth()">Use this month</button>
+      <div class="filter-divider"></div>
+      <div class="view-tabs" id="mgTypeTabs">
+        <button class="view-tab active" data-type="estimations" onclick="mgSwitchType('estimations')">Estimations</button>
+        <button class="view-tab" data-type="approvals" onclick="mgSwitchType('approvals')">Approvals</button>
+        <button class="view-tab" data-type="deliveries" onclick="mgSwitchType('deliveries')">Deliveries</button>
+      </div>
+      <div style="flex:1"></div>
+      <button class="note-save-btn" onclick="mgShowForm()">+ Add Row</button>
+    </div>
+
+    <div id="mgFormWrap" style="display:none"></div>
+
+    <div class="table-wrap">
+      <table id="mgTable">
+        <thead><tr id="mgTableHead"></tr></thead>
+        <tbody id="mgTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   AUTH + API
+   CSV parsing now happens server-side; the frontend only
+   uploads raw files and fetches the parsed store as JSON.
+════════════════════════════════════════════════════ */
+const TOKEN_KEY = 'pmDash_token';
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+const setToken = t => localStorage.setItem(TOKEN_KEY, t);
+const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+async function apiFetch(url, opts = {}) {
+  const headers = opts.headers ? { ...opts.headers } : {};
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401) {
+    clearToken();
+    showLogin('Session expired — please sign in again.');
+    throw new Error('Unauthorized');
+  }
+  return res;
+}
+
+function showLogin(message) {
+  document.getElementById('loginOverlay').style.display = 'flex';
+  const err = document.getElementById('loginError');
+  if (message) { err.textContent = message; err.style.display = 'block'; }
+  else { err.style.display = 'none'; }
+}
+function hideLogin() {
+  document.getElementById('loginOverlay').style.display = 'none';
+}
+
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const body = new URLSearchParams({ username, password });
+  try {
+    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    if (!res.ok) throw new Error('Incorrect username or password');
+    const data = await res.json();
+    setToken(data.access_token);
+    hideLogin();
+    await rebuildAll();
+  } catch (err) {
+    showLogin(err.message);
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  clearToken();
+  DATA = null;
+  toggleEmptyState();
+  showLogin();
+});
+
+/** Fetch the full { "YYYY-MM": {estimations,approvals,deliveries} } store from the API */
+async function loadStore() {
+  const res = await apiFetch('/api/data');
+  if (!res.ok) return {};
+  return res.json();
+}
+async function deleteMonth(ym) {
+  await apiFetch(`/api/months/${ym}`, { method: 'DELETE' });
+}
+
+/* ════════════════════════════════════════════════════
+   UTILITIES
+════════════════════════════════════════════════════ */
+const getMonth = ts => ts.slice(0, 7);
+const monthLabel = ym => {
+  const [y, m] = ym.split('-');
+  return new Date(+y, +m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+};
+
+const _nameMap = {};
+function normName(n) { return n.trim().toLowerCase().replace(/\s+/g,' '); }
+function canon(n) {
+  const k = normName(n);
+  if (!_nameMap[k]) _nameMap[k] = n.trim();
+  return _nameMap[k];
+}
+
+function classifyFeedback(raw) {
+  if (!raw || !raw.trim()) return 'None';
+  const v = raw.trim().toLowerCase();
+  if (v.includes('positive')) return 'Positive';
+  if (v.includes('negative')) return 'Negative';
+  if (v.includes('neutral') || v.includes('mixed')) return 'Neutral';
+  return 'None';
+}
+function feedbackScore(pos, neu, neg, none) {
+  const total = pos + neu + neg + none;
+  if (!total) return null;
+  return ((pos * 1 + neu * 0.5) / total) * 100;
+}
+function fmt1(v)   { return (v == null || isNaN(v)) ? '—' : (+v).toFixed(1); }
+function fmtPct(v) { return (v == null || isNaN(v)) ? '—' : (+v).toFixed(1) + '%'; }
+function barColor(v) { return v >= 70 ? '#22c55e' : v >= 40 ? '#f59e0b' : '#ef4444'; }
+function varClass(v) { if (v == null || isNaN(v)) return ''; return v > 20 ? 'text-red' : v > 0 ? 'text-amber' : 'text-green'; }
+function rateClass(v){ if (v == null || isNaN(v)) return ''; return v >= 70 ? 'text-green' : v >= 40 ? 'text-amber' : 'text-red'; }
+function fbClass(v)  { if (v == null || isNaN(v)) return ''; return v >= 70 ? 'text-green' : v >= 40 ? 'text-amber' : 'text-red'; }
+
+const PALETTE = ['#4f46e5','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4','#a855f7','#e11d48','#0d9488','#3b82f6','#d946ef'];
+
+/* ════════════════════════════════════════════════════
+   DATA PROCESSING  — builds all derived stats from raw store
+════════════════════════════════════════════════════ */
+let DATA = null;   // computed globally, refreshed on each upload/delete
+
+async function processAllMonths() {
+  const store = await loadStore();  // { "2026-04": { estimations:[], approvals:[], deliveries:[] }, … }
+  const allMonths = Object.keys(store).sort();
+
+  if (!allMonths.length) { DATA = null; return; }
+
+  // Flatten and enrich every record
+  const ests = [], apps = [], dels = [];
+  allMonths.forEach(ym => {
+    const d = store[ym];
+    (d.estimations || []).forEach(r => ests.push({ ...r, month: ym, estimators: r.estimators.map(canon), manager: canon(r.manager) }));
+    (d.approvals   || []).forEach(r => apps.push({ ...r, month: ym, estimators: r.estimators.map(canon), manager: canon(r.manager) }));
+    (d.deliveries  || []).forEach(r => {
+      const fb = classifyFeedback(r.feedback);
+      const devs = r.developers.map(canon);
+      const n = devs.length || 1;
+      dels.push({ ...r, month: ym, manager: canon(r.manager), developers: devs, feedbackClass: fb, hoursPerDev: r.actualHours / n, approvedPerDev: r.approvedHours / n });
+    });
+  });
+
+  // Role map
+  const empRoles = {};
+  const addRole = (name, role) => { if (!name) return; if (!empRoles[name]) empRoles[name] = new Set(); empRoles[name].add(role); };
+  ests.forEach(r => { r.estimators.forEach(e => addRole(e,'Estimator')); addRole(r.manager,'Manager'); });
+  apps.forEach(r => { r.estimators.forEach(e => addRole(e,'Estimator')); addRole(r.manager,'Manager'); });
+  dels.forEach(r => { addRole(r.manager,'Manager'); r.developers.forEach(d => addRole(d,'Developer')); });
+
+  // Per-person per-month stats
+  const stats = {};
+  const blank = () => ({ estimations:0, approvals:0, deliveries:0, pos:0, neu:0, neg:0, noFb:0, actualHours:0, estimatedHours:0, projects:{} });
+  const ensure = (name, month) => { if (!stats[name]) stats[name]={}; if (!stats[name][month]) stats[name][month]=blank(); return stats[name][month]; };
+  const ensureProj = (name, month, proj) => { const s=ensure(name,month); if (!s.projects[proj]) s.projects[proj]={role:'',estimations:0,approvals:0,deliveries:0,feedback:'',actualHours:0,estimatedHours:0}; return s.projects[proj]; };
+  const addFb = (s, fb) => { if (fb==='Positive') s.pos++; else if (fb==='Neutral') s.neu++; else if (fb==='Negative') s.neg++; else s.noFb++; };
+
+  ests.forEach(r => {
+    r.estimators.forEach(e => {
+      ensure(e, r.month).estimations++;
+      const p = ensureProj(e, r.month, r.project); p.estimations++;
+      if (!p.role.includes('Estimator')) p.role = (p.role ? p.role+'/' : '')+'Estimator';
+    });
+    ensure(r.manager, r.month).estimations++;
+    const pm = ensureProj(r.manager, r.month, r.project); pm.estimations++;
+    if (!pm.role.includes('Manager')) pm.role = (pm.role ? pm.role+'/' : '')+'Manager';
+  });
+
+  apps.forEach(r => {
+    r.estimators.forEach(e => { ensure(e, r.month).approvals++; ensureProj(e, r.month, r.project).approvals++; });
+    ensure(r.manager, r.month).approvals++;
+    ensureProj(r.manager, r.month, r.project).approvals++;
+  });
+
+  dels.forEach(r => {
+    const sm = ensure(r.manager, r.month);
+    sm.deliveries++; addFb(sm, r.feedbackClass);
+    const pm = ensureProj(r.manager, r.month, r.project);
+    pm.deliveries++; pm.feedback = r.feedbackClass;
+    if (!pm.role.includes('Manager')) pm.role = (pm.role ? pm.role+'/' : '')+'Manager';
+
+    r.developers.forEach(dev => {
+      const sd = ensure(dev, r.month);
+      sd.deliveries++; addFb(sd, r.feedbackClass);
+      sd.actualHours    += r.hoursPerDev;
+      sd.estimatedHours += r.approvedPerDev;
+      const pd = ensureProj(dev, r.month, r.project);
+      pd.deliveries++; pd.feedback = r.feedbackClass;
+      pd.actualHours    += r.hoursPerDev;
+      pd.estimatedHours += r.approvedPerDev;
+      if (!pd.role.includes('Developer')) pd.role = (pd.role ? pd.role+'/' : '')+'Developer';
+    });
+  });
+
+  // Funnel data per month
+  const funnelData = {};
+  allMonths.forEach(m => {
+    const estR = ests.filter(r => r.month === m);
+    const appR = apps.filter(r => r.month === m);
+    const delR = dels.filter(r => r.month === m);
+    const estP={}, appP={}, delP={};
+    estR.forEach(r => { r.estimators.forEach(e => { estP[e]=(estP[e]||0)+1; }); estP[r.manager]=(estP[r.manager]||0)+1; });
+    appR.forEach(r => { r.estimators.forEach(e => { appP[e]=(appP[e]||0)+1; }); appP[r.manager]=(appP[r.manager]||0)+1; });
+    delR.forEach(r => { delP[r.manager]=(delP[r.manager]||0)+1; r.developers.forEach(d => { delP[d]=(delP[d]||0)+1; }); });
+    funnelData[m] = { est:estR.length, app:appR.length, del:delR.length, estPeople:estP, appPeople:appP, delPeople:delP };
+  });
+
+  // Company summary per month
+  const companySummary = {};
+  allMonths.forEach(m => {
+    const f = funnelData[m];
+    let ah=0, eh=0, pos=0, neu=0, neg=0, noFb=0;
+    dels.filter(d => d.month===m).forEach(d => {
+      ah += d.actualHours; eh += d.approvedHours;
+      if (d.feedbackClass==='Positive') pos++; else if (d.feedbackClass==='Neutral') neu++;
+      else if (d.feedbackClass==='Negative') neg++; else noFb++;
+    });
+    companySummary[m] = {
+      estimations: f.est, approvals: f.app,
+      approvalRate: f.est>0 ? (f.app/f.est)*100 : null,
+      deliveries: f.del,
+      feedbackScore: feedbackScore(pos, neu, neg, noFb),
+      actualHours: ah, estimatedHours: eh,
+      timeVariance: eh>0 ? ((ah-eh)/eh)*100 : null,
+    };
+  });
+
+  DATA = { months: allMonths, empRoles, stats, funnelData, companySummary,
+    totalEst: ests.length, totalApp: apps.length, totalDel: dels.length };
+}
+
+/* ════════════════════════════════════════════════════
+   FILE UPLOAD HANDLER
+════════════════════════════════════════════════════ */
+document.getElementById('csvFileInput').addEventListener('change', async function() {
+  const files = Array.from(this.files);
+  if (!files.length) return;
+  const statusEl = document.getElementById('uploadStatus');
+  let ok = 0, fail = 0;
+  try {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
+    const results = await res.json();
+    results.forEach(r => { if (r.ok) ok++; else { fail++; console.error('CSV parse error:', r.filename, r.error); } });
+  } catch (e) {
+    fail = files.length;
+    console.error('Upload failed:', e);
+  }
+  if (fail === 0) {
+    statusEl.className = 'upload-status ok';
+    statusEl.textContent = `✓ ${ok} file${ok>1?'s':''} loaded successfully`;
+  } else {
+    statusEl.className = 'upload-status err';
+    statusEl.textContent = `⚠ ${ok} loaded, ${fail} failed — check console`;
+  }
+  setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'upload-status'; }, 4000);
+  this.value = '';   // reset so same file can be re-uploaded
+  rebuildAll();
+});
+
+/* ════════════════════════════════════════════════════
+   SORT STATE + CHARTS CACHE
+════════════════════════════════════════════════════ */
+let sortCol = 'name', sortDir = 1;
+const charts = {};
+
+/* ════════════════════════════════════════════════════
+   NOTES  — { employeeName: { "YYYY-MM": {note, updated_by, updated_at} } }
+════════════════════════════════════════════════════ */
+let NOTES_CACHE = {};
+let CURRENT_ROWS = [];
+
+async function refreshNotesCache() {
+  try {
+    const res = await apiFetch('/api/notes');
+    NOTES_CACHE = res.ok ? await res.json() : {};
+  } catch { NOTES_CACHE = {}; }
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function noteMetaText(noteRec) {
+  if (!noteRec) return 'No note saved for this month yet.';
+  const when = noteRec.updated_at ? new Date(noteRec.updated_at).toLocaleString() : '';
+  return `Last saved by ${noteRec.updated_by || 'unknown'}${when ? ' · ' + when : ''}`;
+}
+
+async function saveNote(idx) {
+  const row = CURRENT_ROWS[idx];
+  if (!row) return;
+  const month = document.getElementById('filterMonth').value;
+  const textarea = document.getElementById(`note-${idx}`);
+  const metaEl = document.getElementById(`note-meta-${idx}`);
+  const text = textarea.value;
+  metaEl.textContent = 'Saving…';
+  try {
+    const res = await apiFetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employee_name: row.name, year_month: month, note: text }),
+    });
+    const data = await res.json();
+    if (!NOTES_CACHE[row.name]) NOTES_CACHE[row.name] = {};
+    if (data.note) { NOTES_CACHE[row.name][month] = data.note; }
+    else { delete NOTES_CACHE[row.name][month]; }
+    metaEl.textContent = noteMetaText(data.note);
+  } catch (e) {
+    metaEl.textContent = 'Save failed — check connection and try again.';
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   VIEW SWITCHING  — Dashboard vs Manage Data
+════════════════════════════════════════════════════ */
+function switchView(view) {
+  document.getElementById('mainContent').style.display = view === 'dashboard' ? '' : 'none';
+  document.getElementById('manageView').style.display = view === 'manage' ? '' : 'none';
+  document.getElementById('tabDashboardBtn').classList.toggle('active', view === 'dashboard');
+  document.getElementById('tabManageBtn').classList.toggle('active', view === 'manage');
+  if (view === 'manage') mgRefresh();
+}
+
+/* ════════════════════════════════════════════════════
+   MANAGE DATA  — manual add / edit / delete of records
+════════════════════════════════════════════════════ */
+let MG_TYPE = 'estimations';
+let MG_RECORDS = [];
+let MG_EDIT_ID = null;  // null = "add" mode, otherwise the record id being edited
+
+function mgDefaultTimestamp() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function mgFieldsFor(type) {
+  if (type === 'deliveries') {
+    return [
+      { key: 'ts', label: 'Timestamp', type: 'text', placeholder: 'YYYY-MM-DD HH:MM:SS' },
+      { key: 'project', label: 'Project', type: 'text' },
+      { key: 'manager', label: 'Manager', type: 'text' },
+      { key: 'feedback', label: 'Feedback', type: 'select', options: ['Positive', 'Neutral', 'Negative', 'None'] },
+      { key: 'developers', label: 'Developer(s)', type: 'text', placeholder: 'comma-separated names' },
+      { key: 'actualHours', label: 'Actual Hours', type: 'number' },
+      { key: 'approvedHours', label: 'Approved Hours', type: 'number' },
+    ];
+  }
+  return [
+    { key: 'ts', label: 'Timestamp', type: 'text', placeholder: 'YYYY-MM-DD HH:MM:SS' },
+    { key: 'project', label: 'Project', type: 'text' },
+    { key: 'estimators', label: 'Estimator(s)', type: 'text', placeholder: 'comma-separated names' },
+    { key: 'manager', label: 'Manager', type: 'text' },
+  ];
+}
+
+function mgColumnsFor(type) {
+  return type === 'deliveries'
+    ? [['ts','Timestamp'],['project','Project'],['manager','Manager'],['feedback','Feedback'],['developers','Developer(s)'],['actualHours','Actual Hrs'],['approvedHours','Approved Hrs']]
+    : [['ts','Timestamp'],['project','Project'],['estimators','Estimator(s)'],['manager','Manager']];
+}
+
+function mgPopulateMonthSelect() {
+  const sel = document.getElementById('mgMonth');
+  const prev = sel.value;
+  const months = DATA ? DATA.months : [];
+  sel.innerHTML = months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+  if (months.includes(prev)) sel.value = prev;
+  else if (months.length) sel.value = months[months.length - 1];
+}
+
+function mgUseNewMonth() {
+  const input = document.getElementById('mgNewMonth');
+  const val = input.value.trim();
+  if (!/^\d{4}-\d{2}$/.test(val)) { alert('Enter the month as YYYY-MM, e.g. 2026-06'); return; }
+  const sel = document.getElementById('mgMonth');
+  if (![...sel.options].some(o => o.value === val)) {
+    sel.appendChild(new Option(monthLabel(val), val));
+  }
+  sel.value = val;
+  input.value = '';
+  mgHideForm();
+  mgRefresh();
+}
+
+function mgSwitchType(type) {
+  MG_TYPE = type;
+  document.querySelectorAll('#mgTypeTabs .view-tab').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  mgHideForm();
+  mgRefresh();
+}
+
+document.getElementById('mgMonth').addEventListener('change', () => { mgHideForm(); mgRefresh(); });
+
+async function mgRefresh() {
+  mgPopulateMonthSelect();
+  const month = document.getElementById('mgMonth').value;
+  if (!month) { MG_RECORDS = []; mgRenderTable(); return; }
+  try {
+    const res = await apiFetch(`/api/records/${month}/${MG_TYPE}`);
+    MG_RECORDS = res.ok ? await res.json() : [];
+  } catch { MG_RECORDS = []; }
+  mgRenderTable();
+}
+
+function mgRenderTable() {
+  const cols = mgColumnsFor(MG_TYPE);
+  document.getElementById('mgTableHead').innerHTML = cols.map(([,label]) => `<th>${label}</th>`).join('') + '<th>Source</th><th></th>';
+  const tbody = document.getElementById('mgTableBody');
+  if (!MG_RECORDS.length) {
+    tbody.innerHTML = `<tr><td colspan="${cols.length+2}" class="no-data">No records for this month/type yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = MG_RECORDS.map(r => {
+    const cells = cols.map(([key]) => {
+      let v = r[key];
+      if (Array.isArray(v)) v = v.join(', ');
+      return `<td>${escapeHtml(v == null || v === '' ? '—' : String(v))}</td>`;
+    }).join('');
+    const srcLabel = r.source === 'manual' ? 'Manual' : (r.edited ? 'CSV (edited)' : 'CSV');
+    const srcCls = r.source === 'manual' || r.edited ? 'pill-amber' : 'pill-green';
+    return `<tr>${cells}<td><span class="kpi-pill ${srcCls}">${srcLabel}</span></td>
+      <td style="white-space:nowrap">
+        <button class="mg-row-btn" onclick="mgEditRow('${r.id}')">Edit</button>
+        <button class="mg-row-btn mg-row-btn-danger" onclick="mgDeleteRow('${r.id}')">Delete</button>
+      </td></tr>`;
+  }).join('');
+}
+
+function mgShowForm(record) {
+  MG_EDIT_ID = record ? record.id : null;
+  const fields = mgFieldsFor(MG_TYPE);
+  const wrap = document.getElementById('mgFormWrap');
+  wrap.style.display = 'block';
+  wrap.innerHTML = `
+    <div class="card" style="background:#f8f9fb;margin-bottom:16px">
+      <div class="expand-title">${record ? 'Edit' : 'Add'} ${MG_TYPE.slice(0, -1)} record</div>
+      <div class="mg-form-grid">
+        ${fields.map(f => {
+          const raw = record ? record[f.key] : (f.key === 'ts' ? mgDefaultTimestamp() : '');
+          const val = Array.isArray(raw) ? raw.join(', ') : (raw ?? '');
+          if (f.type === 'select') {
+            return `<div class="filter-group"><div class="filter-label">${f.label}</div>
+              <select class="filter-select" id="mgField-${f.key}">
+                ${f.options.map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+              </select></div>`;
+          }
+          return `<div class="filter-group"><div class="filter-label">${f.label}</div>
+            <input class="filter-select" type="${f.type}" id="mgField-${f.key}" value="${escapeHtml(String(val))}" placeholder="${f.placeholder||''}" /></div>`;
+        }).join('')}
+      </div>
+      <div class="note-actions">
+        <button class="note-save-btn" onclick="mgSaveForm()">Save</button>
+        <button class="logout-btn" onclick="mgHideForm()" style="background:#fff">Cancel</button>
+        <span class="note-meta" id="mgFormMsg"></span>
+      </div>
+    </div>`;
+}
+
+function mgHideForm() {
+  MG_EDIT_ID = null;
+  const wrap = document.getElementById('mgFormWrap');
+  wrap.style.display = 'none';
+  wrap.innerHTML = '';
+}
+
+function mgEditRow(id) {
+  const record = MG_RECORDS.find(r => r.id === id);
+  if (record) mgShowForm(record);
+}
+
+function mgCollectFormPayload() {
+  const fields = mgFieldsFor(MG_TYPE);
+  const payload = {};
+  for (const f of fields) {
+    const el = document.getElementById(`mgField-${f.key}`);
+    const val = el.value;
+    if (f.key === 'estimators' || f.key === 'developers') {
+      payload[f.key] = val.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (f.type === 'number') {
+      payload[f.key] = parseFloat(val) || 0;
+    } else {
+      payload[f.key] = val.trim();
+    }
+  }
+  return payload;
+}
+
+async function mgSaveForm() {
+  const month = document.getElementById('mgMonth').value;
+  const msgEl = document.getElementById('mgFormMsg');
+  if (!month) { msgEl.textContent = 'Pick or create a month first.'; return; }
+  const payload = mgCollectFormPayload();
+  msgEl.textContent = 'Saving…';
+  try {
+    const url = MG_EDIT_ID ? `/api/records/${month}/${MG_TYPE}/${MG_EDIT_ID}` : `/api/records/${month}/${MG_TYPE}`;
+    const res = await apiFetch(url, {
+      method: MG_EDIT_ID ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Save failed'); }
+    mgHideForm();
+    await mgRefresh();
+    await rebuildAll();
+  } catch (e) {
+    msgEl.textContent = e.message;
+  }
+}
+
+async function mgDeleteRow(id) {
+  if (!confirm('Delete this record? This cannot be undone.')) return;
+  const month = document.getElementById('mgMonth').value;
+  try {
+    await apiFetch(`/api/records/${month}/${MG_TYPE}/${id}`, { method: 'DELETE' });
+    await mgRefresh();
+    await rebuildAll();
+  } catch (e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   REBUILD EVERYTHING  — called after any data change
+════════════════════════════════════════════════════ */
+async function rebuildAll() {
+  await processAllMonths();
+  await refreshNotesCache();
+  await renderLoadedMonths();
+  rebuildFilters();
+  toggleEmptyState();
+  if (DATA) {
+    render();
+  }
+}
+
+function toggleEmptyState() {
+  const empty = document.getElementById('emptyState');
+  const sections = document.querySelectorAll('.dash-section');
+  if (!DATA) {
+    if (!empty) {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="empty-state" id="emptyState">
+          <div class="icon">📂</div>
+          <h2>No data loaded yet</h2>
+          <p>Upload a <strong>Variable Pay – MMM YY.csv</strong> file using the button above.</p>
+        </div>`;
+    }
+    sections.forEach(s => s.style.display = 'none');
+  } else {
+    const e = document.getElementById('emptyState');
+    if (e) e.remove();
+    ensureDashSections();
+  }
+}
+
+function ensureDashSections() {
+  if (document.getElementById('secA')) return;  // already built
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `
+    <!-- Section A -->
+    <div class="dash-section" id="secA">
+      <div class="section-header">
+        <div class="section-icon" style="background:#ede9fe">📊</div>
+        <div>
+          <div class="section-title">Section A — Company Summary</div>
+          <div class="section-sub">Aggregate KPIs for the selected month and filters</div>
+        </div>
+      </div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+    </div>
+
+    <!-- Section B -->
+    <div class="dash-section card" id="secB">
+      <div class="section-header">
+        <div class="section-icon" style="background:#e0f2fe">👤</div>
+        <div>
+          <div class="section-title">Section B — Individual Performance Matrix</div>
+          <div class="section-sub">Click any row to expand project-level breakdown · 🟢 both metrics &gt;70% · 🔴 either metric &lt;40%</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="perfTable">
+          <thead>
+            <tr>
+              <th data-col="name">Employee <span class="sort-icon">↕</span></th>
+              <th>Role(s)</th>
+              <th data-col="estimations">Est. Made <span class="sort-icon">↕</span></th>
+              <th data-col="approvals">Approved <span class="sort-icon">↕</span></th>
+              <th data-col="approvalRate">Approval % <span class="sort-icon">↕</span></th>
+              <th data-col="deliveries">Deliveries <span class="sort-icon">↕</span></th>
+              <th>Pos / Neu / Neg / None</th>
+              <th data-col="feedbackScore">Feedback % <span class="sort-icon">↕</span></th>
+              <th data-col="actualHours">Actual Hrs <span class="sort-icon">↕</span></th>
+              <th data-col="estimatedHours">Est. Hrs <span class="sort-icon">↕</span></th>
+              <th data-col="timeVariance">Variance % <span class="sort-icon">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="perfBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section C -->
+    <div class="dash-section card" id="secC">
+      <div class="section-header">
+        <div class="section-icon" style="background:#fce7f3">🔀</div>
+        <div>
+          <div class="section-title">Section C — Project Stage Funnel</div>
+          <div class="section-sub">Pipeline conversion Estimation → Approval → Delivery · people counts per stage</div>
+        </div>
+      </div>
+      <div class="funnel-grid" id="funnelGrid"></div>
+    </div>
+
+    <!-- Section D -->
+    <div class="dash-section" id="secD">
+      <div class="section-header">
+        <div class="section-icon" style="background:#fef9c3">📈</div>
+        <div>
+          <div class="section-title">Section D — Month-over-Month Trends</div>
+          <div class="section-sub">All months shown · individual lines + overall benchmark</div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Approval Rate % — estimators &amp; managers + overall</div>
+          <div class="chart-container"><canvas id="chartApproval"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Feedback Score % — all employees + overall</div>
+          <div class="chart-container"><canvas id="chartFeedback"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Time Variance % — developers (overrun vs underrun)</div>
+          <div class="chart-container"><canvas id="chartVariance"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Pipeline Volume — Estimations vs Approvals vs Deliveries</div>
+          <div class="chart-container"><canvas id="chartFunnel"></canvas></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Bind sort header clicks (delegated, so survives re-renders)
+  document.querySelector('#perfTable thead').addEventListener('click', e => {
+    const th = e.target.closest('th[data-col]');
+    if (!th) return;
+    const col = th.dataset.col;
+    if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+    render();
+  });
+}
+
+/* ════════════════════════════════════════════════════
+   LOADED MONTHS CHIPS
+════════════════════════════════════════════════════ */
+function renderLoadedMonths() {
+  const months = DATA ? DATA.months : [];
+  const el = document.getElementById('loadedMonths');
+  if (!months.length) { el.innerHTML = '<span class="text-muted" style="font-size:12px">None</span>'; return; }
+  el.innerHTML = months.map(ym => `
+    <div class="month-chip">
+      ${monthLabel(ym)}
+      <span class="month-chip-del" title="Remove this month" onclick="removeMonth('${ym}')">✕</span>
+    </div>`).join('');
+  document.getElementById('headerStats').textContent =
+    `${months.length} month${months.length>1?'s':''} loaded` +
+    (DATA ? ` · ${DATA.totalEst} Est · ${DATA.totalApp} App · ${DATA.totalDel} Del` : '');
+}
+
+async function removeMonth(ym) {
+  if (!confirm(`Remove data for ${monthLabel(ym)}?`)) return;
+  await deleteMonth(ym);
+  rebuildAll();
+}
+
+/* ════════════════════════════════════════════════════
+   FILTERS
+════════════════════════════════════════════════════ */
+function rebuildFilters() {
+  if (!DATA) return;
+  const mSel = document.getElementById('filterMonth');
+  const prev = mSel.value;
+  while (mSel.options.length) mSel.remove(0);
+  DATA.months.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=monthLabel(m); mSel.appendChild(o); });
+  if (DATA.months.includes(prev)) mSel.value = prev;
+  else if (DATA.months.length) mSel.value = DATA.months[DATA.months.length-1];
+  rebuildEmployeeFilter();
+}
+
+function rebuildEmployeeFilter(keepValue) {
+  if (!DATA) return;
+  const role = document.getElementById('filterRole').value;
+  const eSel = document.getElementById('filterEmployee');
+  const prev = keepValue || eSel.value;
+  while (eSel.options.length > 1) eSel.remove(1);
+  Object.keys(DATA.empRoles).sort().forEach(name => {
+    const roles = [...DATA.empRoles[name]];
+    if (role !== 'All' && !roles.includes(role)) return;
+    const o=document.createElement('option'); o.value=name; o.textContent=name; eSel.appendChild(o);
+  });
+  eSel.value = [...eSel.options].some(o=>o.value===prev) ? prev : 'All';
+}
+
+// Attach filter listeners once (they target persistent elements)
+document.getElementById('filterMonth').addEventListener('change', render);
+document.getElementById('filterRole').addEventListener('change', () => { rebuildEmployeeFilter(); render(); });
+document.getElementById('filterEmployee').addEventListener('change', render);
+
+/* ════════════════════════════════════════════════════
+   SECTION A — KPIs
+════════════════════════════════════════════════════ */
+function renderKPIs(month, roleFilter, empFilter) {
+  let s;
+  if (empFilter !== 'All') {
+    const ms = DATA.stats[empFilter]?.[month] || { estimations:0,approvals:0,deliveries:0,pos:0,neu:0,neg:0,noFb:0,actualHours:0,estimatedHours:0 };
+    const ar = ms.estimations>0 ? (ms.approvals/ms.estimations)*100 : null;
+    const fb = feedbackScore(ms.pos, ms.neu, ms.neg, ms.noFb);
+    const tv = ms.estimatedHours>0 ? ((ms.actualHours-ms.estimatedHours)/ms.estimatedHours)*100 : null;
+    s = { estimations:ms.estimations, approvals:ms.approvals, approvalRate:ar, deliveries:ms.deliveries, feedbackScore:fb, actualHours:ms.actualHours, estimatedHours:ms.estimatedHours, timeVariance:tv };
+  } else if (roleFilter !== 'All') {
+    let est=0,app=0,del=0,pos=0,neu=0,neg=0,noFb=0,ah=0,eh=0;
+    Object.entries(DATA.stats).forEach(([name, mmap]) => {
+      if (![...DATA.empRoles[name]].includes(roleFilter)) return;
+      const ms = mmap[month]; if (!ms) return;
+      est+=ms.estimations; app+=ms.approvals; del+=ms.deliveries;
+      pos+=ms.pos; neu+=ms.neu; neg+=ms.neg; noFb+=ms.noFb; ah+=ms.actualHours; eh+=ms.estimatedHours;
+    });
+    s = { estimations:est, approvals:app, approvalRate:est>0?(app/est)*100:null, deliveries:del, feedbackScore:feedbackScore(pos,neu,neg,noFb), actualHours:ah, estimatedHours:eh, timeVariance:eh>0?((ah-eh)/eh)*100:null };
+  } else {
+    s = DATA.companySummary[month] || {};
+  }
+
+  const kpis = [
+    { label:'Total Estimations', value:s.estimations??0, sub:'projects estimated', pill:null },
+    { label:'Total Approvals',   value:s.approvals??0,   sub:'client-approved',
+      pill:s.approvalRate!=null?{text:fmtPct(s.approvalRate)+' rate', cls:s.approvalRate>=70?'pill-green':s.approvalRate>=40?'pill-amber':'pill-red'}:null },
+    { label:'Approval Rate',     value:fmtPct(s.approvalRate), sub:'approvals ÷ estimations × 100', pill:null },
+    { label:'Total Deliveries',  value:s.deliveries??0,  sub:'projects delivered', pill:null },
+    { label:'Feedback Score',    value:fmtPct(s.feedbackScore), sub:'weighted client satisfaction',
+      pill:s.feedbackScore!=null?{text:s.feedbackScore>=70?'Good':s.feedbackScore>=40?'Moderate':'Poor', cls:s.feedbackScore>=70?'pill-green':s.feedbackScore>=40?'pill-amber':'pill-red'}:null },
+    { label:'Hours Logged',      value:fmt1(s.actualHours??0)+'h', sub:`vs ${fmt1(s.estimatedHours??0)}h estimated`,
+      pill:s.timeVariance!=null?{text:(s.timeVariance>0?'+':'')+fmtPct(s.timeVariance)+' var', cls:s.timeVariance>20?'pill-red':s.timeVariance>0?'pill-amber':'pill-green'}:null },
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k=>`
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      ${k.pill?`<div><span class="kpi-pill ${k.pill.cls}">${k.pill.text}</span></div>`:''}
+    </div>`).join('');
+}
+
+/* ════════════════════════════════════════════════════
+   SECTION B — PERFORMANCE TABLE
+════════════════════════════════════════════════════ */
+function buildRows(month, roleFilter, empFilter) {
+  return Object.entries(DATA.stats).filter(([name]) => {
+    const roles = [...(DATA.empRoles[name] || [])];
+    if (roleFilter !== 'All' && !roles.includes(roleFilter)) return false;
+    if (empFilter  !== 'All' && name !== empFilter)           return false;
+    return true;
+  }).map(([name]) => {
+    const ms = DATA.stats[name][month] || { estimations:0,approvals:0,deliveries:0,pos:0,neu:0,neg:0,noFb:0,actualHours:0,estimatedHours:0,projects:{} };
+    const ar = ms.estimations>0 ? (ms.approvals/ms.estimations)*100 : null;
+    const fb = feedbackScore(ms.pos, ms.neu, ms.neg, ms.noFb);
+    const tv = ms.estimatedHours>0 ? ((ms.actualHours-ms.estimatedHours)/ms.estimatedHours)*100 : null;
+    return { name, roles:[...(DATA.empRoles[name]||[])], estimations:ms.estimations, approvals:ms.approvals, approvalRate:ar, deliveries:ms.deliveries, pos:ms.pos, neu:ms.neu, neg:ms.neg, noFb:ms.noFb, feedbackScore:fb, actualHours:ms.actualHours, estimatedHours:ms.estimatedHours, timeVariance:tv, projects:ms.projects };
+  });
+}
+function sortRows(rows) {
+  return [...rows].sort((a,b) => {
+    let va=a[sortCol], vb=b[sortCol];
+    if (va==null) va = sortDir>0 ? Infinity : -Infinity;
+    if (vb==null) vb = sortDir>0 ? Infinity : -Infinity;
+    return typeof va==='string' ? sortDir*va.localeCompare(vb) : sortDir*(va-vb);
+  });
+}
+function renderTable(month, roleFilter, empFilter) {
+  const rows = sortRows(buildRows(month, roleFilter, empFilter));
+  CURRENT_ROWS = rows;
+  const tbody = document.getElementById('perfBody');
+  if (!rows.length) { tbody.innerHTML=`<tr><td colspan="11" class="no-data">No data for selected filters.</td></tr>`; return; }
+
+  tbody.innerHTML = rows.map((row, i) => {
+    const gr = row.approvalRate!=null&&row.approvalRate>70;
+    const gf = row.feedbackScore!=null&&row.feedbackScore>70;
+    const br = row.approvalRate!=null&&row.approvalRate<40;
+    const bf = row.feedbackScore!=null&&row.feedbackScore<40;
+    const trCls = (gr&&gf)?'row-green':(br||bf)?'row-red':'';
+
+    const roles = row.roles.map(r=>`<span class="role-badge role-${r[0]}">${r}</span>`).join('');
+
+    const arBar = row.approvalRate!=null
+      ? `<div class="rate-bar-wrap"><div class="rate-bar"><div class="rate-bar-fill" style="width:${Math.min(row.approvalRate,100).toFixed(1)}%;background:${barColor(row.approvalRate)}"></div></div><span class="rate-num ${rateClass(row.approvalRate)}">${fmt1(row.approvalRate)}%</span></div>`
+      : `<span class="text-muted">—</span>`;
+    const fbBar = row.feedbackScore!=null
+      ? `<div class="rate-bar-wrap"><div class="rate-bar"><div class="rate-bar-fill" style="width:${Math.min(row.feedbackScore,100).toFixed(1)}%;background:${barColor(row.feedbackScore)}"></div></div><span class="rate-num ${fbClass(row.feedbackScore)}">${fmt1(row.feedbackScore)}%</span></div>`
+      : `<span class="text-muted">—</span>`;
+    const fbD = `<span title="Positive"><span class="fb-dot fb-pos"></span>${row.pos}</span>&ensp;<span title="Neutral"><span class="fb-dot fb-neu"></span>${row.neu}</span>&ensp;<span title="Negative"><span class="fb-dot fb-neg"></span>${row.neg}</span>&ensp;<span title="No feedback"><span class="fb-dot fb-none"></span>${row.noFb}</span>`;
+    const tvS = row.timeVariance!=null ? `<span class="${varClass(row.timeVariance)}">${row.timeVariance>0?'+':''}${fmt1(row.timeVariance)}%</span>` : `<span class="text-muted">—</span>`;
+
+    const mainRow = `<tr class="${trCls}" onclick="toggleExpand(${i})">
+      <td class="name-cell">${row.name}<span class="chevron" id="chev-${i}">▶</span></td>
+      <td>${roles}</td>
+      <td>${row.estimations||'—'}</td>
+      <td>${row.approvals||'—'}</td>
+      <td style="min-width:130px">${arBar}</td>
+      <td>${row.deliveries||'—'}</td>
+      <td style="min-width:150px">${fbD}</td>
+      <td style="min-width:130px">${fbBar}</td>
+      <td>${row.actualHours>0?fmt1(row.actualHours)+'h':'—'}</td>
+      <td>${row.estimatedHours>0?fmt1(row.estimatedHours)+'h':'—'}</td>
+      <td>${tvS}</td>
+    </tr>`;
+
+    const projs = Object.entries(row.projects);
+    const projHTML = projs.length
+      ? projs.map(([pname,pd]) => {
+          const tv2 = pd.estimatedHours>0 ? ((pd.actualHours-pd.estimatedHours)/pd.estimatedHours*100) : null;
+          const fbPillCls = pd.feedback==='Positive' ? 'pill-green' : pd.feedback==='Neutral' ? 'pill-amber' : pd.feedback==='Negative' ? 'pill-red' : null;
+          return `<div class="project-card">
+            <div class="project-name">${pname}</div>
+            <div class="project-stats">
+              ${pd.role?`<span class="project-stat">${pd.role}</span>`:''}
+              ${pd.estimations?`<span class="project-stat">${pd.estimations} Est.</span>`:''}
+              ${pd.approvals?`<span class="project-stat">${pd.approvals} Appr.</span>`:''}
+              ${pd.deliveries?`<span class="project-stat">${pd.deliveries} Del.</span>`:''}
+              ${pd.actualHours?`<span class="project-stat">${fmt1(pd.actualHours)}h actual</span>`:''}
+              ${pd.estimatedHours?`<span class="project-stat">${fmt1(pd.estimatedHours)}h est.</span>`:''}
+              ${tv2!=null?`<span class="project-stat ${varClass(tv2)}">${tv2>0?'+':''}${fmt1(tv2)}% var.</span>`:''}
+            </div>
+            ${fbPillCls?`<span class="project-feedback ${fbPillCls}">${pd.feedback}</span>`:''}
+          </div>`;
+        }).join('')
+      : `<div class="text-muted" style="font-size:12px">No project detail for this period.</div>`;
+
+    const noteRec = (NOTES_CACHE[row.name] && NOTES_CACHE[row.name][month]) || null;
+    const noteHTML = `<div class="note-block">
+      <div class="expand-title">Notes / Review — ${monthLabel(month)}</div>
+      <textarea class="note-textarea" id="note-${i}" placeholder="Write a note or review for ${escapeHtml(row.name)} for this month…">${escapeHtml(noteRec ? noteRec.note : '')}</textarea>
+      <div class="note-actions">
+        <button class="note-save-btn" onclick="saveNote(${i})">Save Note</button>
+        <span class="note-meta" id="note-meta-${i}">${noteMetaText(noteRec)}</span>
+      </div>
+    </div>`;
+
+    return mainRow + `<tr class="expand-row" id="expand-${i}"><td class="expand-cell" colspan="11"><div class="expand-inner"><div class="expand-title">Project Breakdown — ${row.name}</div><div class="project-grid">${projHTML}</div>${noteHTML}</div></td></tr>`;
+  }).join('');
+
+  // Sort icons
+  document.querySelectorAll('#perfTable thead th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === sortCol);
+    const ic = th.querySelector('.sort-icon');
+    if (ic) ic.textContent = th.dataset.col===sortCol ? (sortDir>0?'↑':'↓') : '↕';
+  });
+}
+
+function toggleExpand(idx) {
+  const row=document.getElementById(`expand-${idx}`), chev=document.getElementById(`chev-${idx}`);
+  if (!row) return;
+  const wasOpen = row.classList.contains('open');
+  document.querySelectorAll('.expand-row.open').forEach(r=>r.classList.remove('open'));
+  document.querySelectorAll('.chevron.open').forEach(c=>c.classList.remove('open'));
+  if (!wasOpen) { row.classList.add('open'); if(chev) chev.classList.add('open'); }
+}
+
+/* ════════════════════════════════════════════════════
+   SECTION C — FUNNEL
+════════════════════════════════════════════════════ */
+function renderFunnel(month, roleFilter, empFilter) {
+  const f = DATA.funnelData[month] || {est:0,app:0,del:0,estPeople:{},appPeople:{},delPeople:{}};
+
+  // Determine which names to include based on active filters
+  const nameAllowed = name => {
+    if (empFilter !== 'All') return name === empFilter;
+    if (roleFilter !== 'All') return [...(DATA.empRoles[name]||[])].includes(roleFilter);
+    return true;
+  };
+
+  const estRate = f.est>0 ? ((f.app/f.est)*100).toFixed(1)+'%' : '—';
+  const appRate = f.app>0 ? ((f.del/f.app)*100).toFixed(1)+'%' : '—';
+
+  const ppl = map => Object.entries(map)
+    .filter(([n]) => n && n.trim() && nameAllowed(n))
+    .sort((a,b) => b[1]-a[1])
+    .map(([n,c]) => `<div class="funnel-person"><span>${n}</span><span class="funnel-person-count">${c}</span></div>`)
+    .join('');
+
+  const stages = [
+    {num:f.est, label:'Stage 1 — Estimation', rate:`${f.app} approved (${estRate} → Stage 2)`, ppl:ppl(f.estPeople), color:'#3b82f6'},
+    {num:f.app, label:'Stage 2 — Approval',   rate:`${f.del} delivered (${appRate} → Stage 3)`, ppl:ppl(f.appPeople), color:'#22c55e'},
+    {num:f.del, label:'Stage 3 — Delivery',   rate:'End of pipeline', ppl:ppl(f.delPeople), color:'#a855f7'},
+  ];
+  document.getElementById('funnelGrid').innerHTML = stages.map((s,i) => `
+    <div class="funnel-stage" style="border-left:4px solid ${s.color}">
+      <div class="funnel-stage-num" style="color:${s.color}">${s.num}</div>
+      <div class="funnel-stage-label">${s.label}</div>
+      <div class="funnel-rate" style="color:${s.color}">${s.rate}</div>
+      <div class="funnel-people">${s.ppl || '<div class="text-muted" style="font-size:12px">No matching people for this filter.</div>'}</div>
+      ${i<2 ? `<div class="funnel-arrow">→</div>` : ''}
+    </div>`).join('');
+}
+
+/* ════════════════════════════════════════════════════
+   SECTION D — CHARTS
+════════════════════════════════════════════════════ */
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function personSeries(metric) {
+  const out = {};
+  Object.entries(DATA.stats).forEach(([name, mmap]) => {
+    const vals = DATA.months.map(m => {
+      const s = mmap[m]; if (!s) return null;
+      if (metric==='approvalRate')  return s.estimations>0  ? (s.approvals/s.estimations)*100 : null;
+      if (metric==='feedbackScore') return feedbackScore(s.pos,s.neu,s.neg,s.noFb);
+      if (metric==='timeVariance')  return s.estimatedHours>0 ? ((s.actualHours-s.estimatedHours)/s.estimatedHours)*100 : null;
+      return null;
+    });
+    if (vals.some(v=>v!=null)) out[name] = vals;
+  });
+  return out;
+}
+
+function baseOpts(yMin, yMax) {
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10, padding:8 } } },
+    scales:{
+      x:{ grid:{color:'#f0f0f0'}, ticks:{font:{size:10}} },
+      y:{ min:yMin, max:yMax, grid:{color:'#f0f0f0'}, ticks:{font:{size:10}, callback:v=>v+'%'} },
+    },
+  };
+}
+
+function renderCharts(roleFilter, empFilter) {
+  roleFilter = roleFilter || 'All';
+  empFilter  = empFilter  || 'All';
+  const labels = DATA.months.map(monthLabel);
+
+  // Helper: is a person visible under current filters?
+  const personVisible = name => {
+    if (empFilter !== 'All') return name === empFilter;
+    if (roleFilter !== 'All') return [...(DATA.empRoles[name]||[])].includes(roleFilter);
+    return true;
+  };
+  // Fade anyone not matching the active employee/role filter; otherwise show all at full opacity
+  const lineAlpha = name => personVisible(name) ? 1 : 0.12;
+  const lineWidth = name => (empFilter !== 'All' && name === empFilter) ? 2.5 : 1.5;
+
+  // Chart 1 — Approval rate
+  destroyChart('approval');
+  {
+    const ctx = document.getElementById('chartApproval').getContext('2d');
+    const series = personSeries('approvalRate');
+    const datasets = []; let ci=0;
+    Object.entries(series).forEach(([name,vals]) => {
+      const roles = [...(DATA.empRoles[name]||[])];
+      if (!roles.includes('Estimator') && !roles.includes('Manager')) return;
+      const alpha = lineAlpha(name);
+      const color = PALETTE[ci%PALETTE.length];
+      // fade non-selected: use rgba version of hex colour
+      const bc = alpha < 1 ? hexAlpha(color, alpha) : color;
+      datasets.push({label:name, data:vals, borderColor:bc, backgroundColor:'transparent', tension:.3, spanGaps:true, pointRadius:personVisible(name)?3:0, borderWidth:lineWidth(name)});
+      ci++;
+    });
+    const overall = DATA.months.map(m=>DATA.companySummary[m]?.approvalRate??null);
+    const showOverall = empFilter === 'All';
+    if (showOverall) datasets.push({label:'▶ Overall', data:overall, borderColor:'#1a1d23', backgroundColor:'transparent', tension:.3, spanGaps:true, borderWidth:2.5, borderDash:[5,3], pointRadius:5});
+    charts['approval'] = new Chart(ctx, {type:'line', data:{labels, datasets}, options:baseOpts(0,100)});
+  }
+
+  // Chart 2 — Feedback score
+  destroyChart('feedback');
+  {
+    const ctx = document.getElementById('chartFeedback').getContext('2d');
+    const series = personSeries('feedbackScore');
+    const datasets = []; let ci=0;
+    Object.entries(series).forEach(([name,vals]) => {
+      const alpha = lineAlpha(name);
+      const color = PALETTE[ci%PALETTE.length];
+      const bc = alpha < 1 ? hexAlpha(color, alpha) : color;
+      datasets.push({label:name, data:vals, borderColor:bc, backgroundColor:'transparent', tension:.3, spanGaps:true, pointRadius:personVisible(name)?3:0, borderWidth:lineWidth(name)});
+      ci++;
+    });
+    const overall = DATA.months.map(m=>DATA.companySummary[m]?.feedbackScore??null);
+    const showOverall = empFilter === 'All';
+    if (showOverall) datasets.push({label:'▶ Overall', data:overall, borderColor:'#1a1d23', backgroundColor:'transparent', tension:.3, spanGaps:true, borderWidth:2.5, borderDash:[5,3], pointRadius:5});
+    charts['feedback'] = new Chart(ctx, {type:'line', data:{labels, datasets}, options:baseOpts(0,100)});
+  }
+
+  // Chart 3 — Time variance (developers only, filtered)
+  destroyChart('variance');
+  {
+    const ctx = document.getElementById('chartVariance').getContext('2d');
+    const series = personSeries('timeVariance');
+    const datasets = [];
+    Object.entries(series).forEach(([name,vals]) => {
+      if (![...(DATA.empRoles[name]||[])].includes('Developer')) return;
+      if (!vals.some(v=>v!=null)) return;
+      const alpha = lineAlpha(name);
+      const bg = vals.map(v => {
+        if (v==null) return 'transparent';
+        const base = v>20?'#ef4444':v>0?'#f59e0b':'#22c55e';
+        return hexAlpha(base, alpha < 1 ? 0.15 : 0.38);
+      });
+      const bc = vals.map(v => {
+        if (v==null) return 'transparent';
+        const base = v>20?'#ef4444':v>0?'#f59e0b':'#22c55e';
+        return hexAlpha(base, alpha < 1 ? 0.2 : 1);
+      });
+      datasets.push({label:name, data:vals, backgroundColor:bg, borderColor:bc, borderWidth:lineWidth(name)});
+    });
+    charts['variance'] = new Chart(ctx, {
+      type:'bar', data:{labels, datasets},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{font:{size:10},boxWidth:10,padding:8}}},
+        scales:{ x:{grid:{color:'#f0f0f0'},ticks:{font:{size:10}}}, y:{grid:{color:'#f0f0f0'},ticks:{font:{size:10},callback:v=>v+'%'}} },
+      },
+    });
+  }
+
+  // Chart 4 — Pipeline volume
+  destroyChart('funnel');
+  {
+    const ctx = document.getElementById('chartFunnel').getContext('2d');
+    charts['funnel'] = new Chart(ctx, {
+      type:'bar',
+      data:{ labels, datasets:[
+        {label:'Estimations', data:DATA.months.map(m=>DATA.funnelData[m]?.est??0), backgroundColor:'#3b82f640', borderColor:'#3b82f6', borderWidth:1.5},
+        {label:'Approvals',   data:DATA.months.map(m=>DATA.funnelData[m]?.app??0), backgroundColor:'#22c55e40', borderColor:'#22c55e', borderWidth:1.5},
+        {label:'Deliveries',  data:DATA.months.map(m=>DATA.funnelData[m]?.del??0), backgroundColor:'#a855f740', borderColor:'#a855f7', borderWidth:1.5},
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{font:{size:10},boxWidth:10,padding:8}}},
+        scales:{ x:{grid:{color:'#f0f0f0'},ticks:{font:{size:10}}}, y:{beginAtZero:true,grid:{color:'#f0f0f0'},ticks:{font:{size:10},stepSize:1}} },
+      },
+    });
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   UTILITY — convert hex colour to rgba string
+════════════════════════════════════════════════════ */
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ════════════════════════════════════════════════════
+   MASTER RENDER — all four sections respond to filters
+════════════════════════════════════════════════════ */
+function render() {
+  if (!DATA) return;
+  const month = document.getElementById('filterMonth').value;
+  const role  = document.getElementById('filterRole').value;
+  const emp   = document.getElementById('filterEmployee').value;
+  renderKPIs(month, role, emp);
+  renderTable(month, role, emp);
+  renderFunnel(month, role, emp);
+  renderCharts(role, emp);
+}
+
+/* ════════════════════════════════════════════════════
+   BOOT  — require a signed-in session, then load data from the API
+════════════════════════════════════════════════════ */
+if (getToken()) {
+  rebuildAll();
+} else {
+  showLogin();
+}
+</script>
+</body>
+</html>

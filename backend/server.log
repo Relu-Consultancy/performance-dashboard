@@ -1,0 +1,59 @@
+INFO:     Started server process [17156]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8003 (Press CTRL+C to quit)
+INFO:     127.0.0.1:55462 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59349 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59349 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59349 - "POST /api/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59349 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59349 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59349 - "GET /api/records/2026-05/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59349 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53210 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61252 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "POST /api/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/records/2026-05/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "POST /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "PUT /api/records/2026-04/estimations/75947576db5a46fbae93edaf9321aea2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "DELETE /api/records/2026-04/estimations/75947576db5a46fbae93edaf9321aea2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52143 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56769 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "POST /api/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-05/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "POST /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/deliveries HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "POST /api/records/2026-04/deliveries HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/deliveries HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "DELETE /api/records/2026-04/deliveries/c3b2c4adc02f47a5ba5fad509a726fc4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/deliveries HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "DELETE /api/records/2026-04/estimations/745fd5d1b6dc4e9f9a8fe7e12305094c HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/records/2026-04/estimations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/data HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56769 - "GET /api/notes HTTP/1.1" 200 OK
