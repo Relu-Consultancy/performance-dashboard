@@ -13,11 +13,12 @@ Base.metadata.create_all(bind=engine)
 
 
 def _ensure_seed_admin():
-    """Auto-create an admin user from env vars on first boot.
+    """Create (or reset the password of) the admin user from env vars on every boot.
 
     Render's free tier has no Shell access to run `create_user.py` by hand,
-    so this is the only way to get a first login without a paid instance.
-    No-ops once any user already exists.
+    so this is the only way to get/reset a login without a paid instance.
+    Always syncs this specific username's password to match the env var,
+    so it's safe to redeploy repeatedly and self-heals any stale state.
     """
     username = os.environ.get("PMDASH_ADMIN_USERNAME")
     password = os.environ.get("PMDASH_ADMIN_PASSWORD")
@@ -25,9 +26,12 @@ def _ensure_seed_admin():
         return
     db = SessionLocal()
     try:
-        if db.query(User).count() == 0:
+        user = db.query(User).filter(User.username == username).first()
+        if user:
+            user.hashed_password = hash_password(password)
+        else:
             db.add(User(username=username, hashed_password=hash_password(password)))
-            db.commit()
+        db.commit()
     finally:
         db.close()
 
